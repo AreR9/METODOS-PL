@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Método Gráfico</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --border-color: #e2e8f0;
+            --success: #16a34a;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1200px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 { color: var(--primary); margin: 0 0 10px 0; }
+
+        .container {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+            align-items: start;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        input[type="number"], select {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            width: 70px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        select { width: auto; font-weight: bold; cursor: pointer; }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+
+        button:hover { background-color: var(--primary-dark); }
+
+        .chart-container {
+            height: 500px;
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .results-box {
+            margin-top: 20px;
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 5px solid var(--primary);
+        }
+
+        .results-box table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .results-box th, .results-box td {
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            background: white;
+        }
+        
+        .results-box th { background: #e2e8f0; }
+
+        .optimal-row { background-color: #dcfce3 !important; font-weight: bold; color: var(--success); }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: #64748b;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background-color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+<a href="Menú.html" class="back-btn">← Volver al Menú</a>
+
+<header>
+    <h1>Método Gráfico</h1>
+    <p>Calculadora exacta para 2 variables (x₁, x₂).</p>
+</header>
+
+<div class="container">
+    <div class="card">
+        <h3 class="section-title">Función Objetivo</h3>
+        <div class="row" style="margin-bottom: 15px;">
+            <select id="tipo-optimizacion" style="margin-right: 10px;">
+                <option value="max">Maximizar</option>
+                <option value="min">Minimizar</option>
+            </select>
+            Z = 
+            <input type="number" id="z1" value="0"> x₁ + 
+            <input type="number" id="z2" value="0"> x₂
+        </div>
+
+        <h3 class="section-title" style="margin-top: 20px;">Restricciones</h3>
+        <div class="row" style="margin-bottom: 20px;">
+            <label>Cantidad de restricciones:</label>
+            <input type="number" id="num-restricciones" value="2" min="1" max="10" onchange="generarFormulario()">
+        </div>
+
+        <div id="restr-inputs"></div>
+        <p style="font-size: 0.85em; color: gray;">* La no negatividad (x₁, x₂ ≥ 0) es automática.</p>
+
+        <button onclick="ejecutar()">Resolver y Graficar</button>
+    </div>
+
+    <div class="card" style="display: flex; flex-direction: column;">
+        <div id="graficoPlotly" class="chart-container"></div>
+        <div id="resultados" class="results-box" style="display: none;"></div>
+    </div>
+</div>
+
+<script>
+    //genera el fromulario donde se ingresan las restricciones
+    function generarFormulario() {
+        //busca el contenedor donde se van a agregar las restricciones
+        const container = document.getElementById('restr-inputs');
+        //obtiene el numero de restricciones que se desea agregar
+        const num = parseInt(document.getElementById('num-restricciones').value) || 2;
+        //limpia el contenedor para agregar las nuevas restricciones
+        container.innerHTML = '';
+
+        //aqui toma la cantidad de restricciones y las va creando dinamicamente
+        for (let i = 0; i < num; i++) {
+            //lo coloca en una fila del html
+            const div = document.createElement('div');
+            //le asigna la clase row para que se vea ordenado
+            div.className = 'row';
+            //abre un espacio para escribir html
+            div.innerHTML = `
+                 R${i+1}:
+                <input type="number" id="a${i}" value="0" step="any"> x₁ + 
+                <input type="number" id="b${i}" value="0" step="any"> x₂
+                <select id="s${i}">
+                    <option value="<=">≤</option>
+                    <option value=">=">≥</option>
+                    <option value="=">=</option>
+                </select>
+                <input type="number" id="c${i}" value="0" step="any">
+            `;
+            //ax1​+bx2​(≤,≥,=)c
+            container.appendChild(div);
+        }
+    }
+//boton ejecutar
+    function ejecutar() {
+        //toma num de restricciones
+        const num = parseInt(document.getElementById('num-restricciones').value);
+        //funcion Z
+        const z1 = parseFloat(document.getElementById('z1').value) || 0;
+
+        const z2 = parseFloat(document.getElementById('z2').value) || 0;
+        //max o min
+        const tipoOpt = document.getElementById('tipo-optimizacion').value;
+        
+        //arreglo de restri
+        let restricciones = [];
+        //arreglo para verificar si estan en blanco
+        let todoCero = true;
+        //esqueletos de las restricciones
+        //dentro de un ciclo para repetirlo segun el num de restricciones
+        for (let i = 0; i < num; i++) {
+            let a = parseFloat(document.getElementById(`a${i}`).value) || 0;//x1
+            let b = parseFloat(document.getElementById(`b${i}`).value) || 0;//x2
+            let s = document.getElementById(`s${i}`).value;//signo
+            let c = parseFloat(document.getElementById(`c${i}`).value) || 0;//resultado
+            
+            if (a !== 0 || b !== 0 || c !== 0) todoCero = false;//verifica si no hay en blanco
+            
+            restricciones.push({ a, b, s, c });//agrega la restriccion al arreglo ya con
+            //los datos en forma de ax1 + bx2 (<=, >=, =) c
+        }
+
+        //verifica si la funcion objetivo esta en blanco
+        
+        if (z1 !== 0 || z2 !== 0) todoCero = false;
+        //si es true
+        //entonces muestra un grafico vacio y oculta los resultados
+        //solo si no hay nada de datos
+        if (todoCero) {
+            Plotly.newPlot('graficoPlotly', [], {//crea el grafico vacio
+                title: 'Gráfico de Solución (Esperando datos)',//titulo
+                xaxis: { title: 'x₁', range: [0, 10], zeroline: true },//eje x
+                yaxis: { title: 'x₂', range: [0, 10], zeroline: true },//eje y
+                margin: { l: 50, r: 20, t: 40, b: 50 }//margenes
+            }, {responsive: true});//se adapta a la pantalla
+            document.getElementById('resultados').style.display = 'none';//oculta caja de resul
+            return;
+        }
+
+        let lineasInterseccion = [...restricciones];//copia de restricciones
+        //no negatividad
+        lineasInterseccion.push({a: 1, b: 0, s: '>=', c: 0}); // x1 >= 0
+        lineasInterseccion.push({a: 0, b: 1, s: '>=', c: 0}); // x2 >= 0
+
+        
+        //(x,y) de cada interseccion
+        let puntos = [];
+        //numero muy pequeñopara evitar el uso de 0
+        //sirve para comparar si un numero es efectivamente 0 o no
+        const EPSILON = 1e-6;
+        
+        for (let i = 0; i < lineasInterseccion.length; i++) {//toma rectas por su R1
+            //toma otrarecta distinta del primer R1
+            for (let j = i + 1; j < lineasInterseccion.length; j++) {
+                //compara la primera recta con la segunda recta y asi sucesivamente con todas las rectas
+                const r1 = lineasInterseccion[i];//toma la primera recta
+                const r2 = lineasInterseccion[j];//toma la segunda recta
+                const det = r1.a * r2.b - r1.b * r2.a;//determina con multiplicacion
+                //que tan paralelas esta, si el det es 0 son paralelas
+                //si no son paralelas det diferente de 0
+                
+                if (Math.abs(det) > EPSILON) {//Si las rectas SI se cruzan
+
+                    const x = (r1.c * r2.b - r1.b * r2.c) / det;//encuentra la coordenada x de la interseccion
+                    const y = (r1.a * r2.c - r1.c * r2.a) / det;//encuentra la coordenada y de la interseccion
+                    // resolviendo ambas ecuaciones al mismo tiempo
+                        //r1.a es el coeficiente de x1 en la primera restriccion
+                        //r1.b es el coeficiente de x2 en la primera restriccion
+                        //r1.c es el resultado de la primera restriccion
+                        //r2.a es el coeficiente de x1 en la segunda restriccion
+                        //r2.b es el coeficiente de x2 en la segunda restriccion
+                        //r2.c es el resultado de la segunda restriccion
+                    if (x >= -EPSILON && y >= -EPSILON) { //verifica que las rectas se crucen en el primer cuadrante (x,y >= 0)
+                        let cumple = true;
+
+                        for (let k = 0; k < restricciones.length; k++) {//para tomar restricciones
+                            const r = restricciones[k];//la toma de la lista de restricciones
+                            //vall=total
+                            const val = r.a * x + r.b * y;//IMPORTANTE: calcula los valores de x1 y x2
+                            //sustitutendo los valores que obtuvimis arrba
+
+
+                            if (r.s === '<=' && val > r.c + EPSILON) cumple = false;//si el signo es menor o igual y el valor es mayor que el resultado de la restriccion entonces no cumple
+                            if (r.s === '>=' && val < r.c - EPSILON) cumple = false;//si el signo es mayor o igual y el valor es menor que el resultado de la restriccion entonces no cumple
+                            if (r.s === '=' && Math.abs(val - r.c) > EPSILON) cumple = false;//si el signo es igual y el valor es diferente al resultado de la restriccion entonces no cumple
+                        }
+                        //si no se incumple ninguna restriccion entonces se agrega el punto a la lista de puntos
+                        if (cumple) puntos.push({ x: Math.max(0, parseFloat(x.toFixed(3))), y: Math.max(0, parseFloat(y.toFixed(3))) });
+                                                //le da x con 3 decimales                   //le da y con 3 decimales                   /
+                    }                                                   //si alguno en 0 lo deja asi
+
+                }
+            }
+        }
+        //elimina puntos duplicados (si dos intersecciones son muy cercanas, se consideran el mismo punto)
+        puntos = puntos.filter((v, i, a) => a.findIndex(t => Math.abs(t.x - v.x) < 1e-4 && Math.abs(t.y - v.y) < 1e-4) === i);
+        //v = el punto actual (ej: {x:6, y:4}) // Elimina puntos repetidos o muy parecidos y deja solo uno de cada tipo
+        //i = su posicion (indice)
+        //a = todo el arreglo (puntos)
+        
+        // Solo si hay suficientes puntos para hacer una figura
+            if (puntos.length > 2) {
+
+                // Saca el centro en x (promedio de todos los puntos)
+                const cx = puntos.reduce((sum, p) => sum + p.x, 0) / puntos.length;
+
+                // Saca el centro en y
+                const cy = puntos.reduce((sum, p) => sum + p.y, 0) / puntos.length;
+
+                // Ordena los puntos alrededor del centro para que no se crucen al dibujar
+                puntos.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+            }
+
+           
+
+        let maxX = 10;//define la recta x en 10
+        let maxY = 10;//define la recta y en 10
+        //recorre las restricciones para bsuscar el valor mas grande para los ejes y,x
+        restricciones.forEach(r => {
+            if (Math.abs(r.a) > EPSILON && r.c / r.a > 0) maxX = Math.max(maxX, r.c / r.a);
+            if (Math.abs(r.b) > EPSILON && r.c / r.b > 0) maxY = Math.max(maxY, r.c / r.b);
+        });
+        puntos.forEach(p => {
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+        });
+        maxX *= 1.2;
+        maxY *= 1.2;
+
+
+        //aqui se crean los trazos para el grafico
+        let trazos = [];
+        //recorre las restricciones para crear las lineas de cada una en el grafico
+        restricciones.forEach((r, i) => {
+            //ignora si son 0
+            if(r.a === 0 && r.b === 0) return;
+
+            //crea los datos para las lineas
+            let xData = [], yData = [];
+            //si b no es 0, entonces se puede despejar y en funcion de x
+            if (Math.abs(r.b) > EPSILON) { 
+                xData = [0, maxX];
+                yData = [r.c / r.b, (r.c - r.a * maxX) / r.b];
+                //si a no es 0, entonces se puede despejar x en funcion de y
+            } else if (Math.abs(r.a) > EPSILON) { 
+                xData = [r.c / r.a, r.c / r.a];
+                yData = [0, maxY];
+            }
+            // Revisa si puede calcular y; si no, dibuja la recta como vertical
+
+
+            //enviamos el arreglo de x,y para que plotly dibje la liena
+            trazos.push({
+               // Usa los puntos calculados para dibujar la línea
+            x: xData, y: yData,
+
+            // Indica que se dibuje como línea
+            mode: 'lines',
+
+            // Le pone nombre a la recta (R1, R2, etc.)
+            name: `R${i+1}`,
+
+            // Define el estilo de la línea (grosor y punteada)
+            line: { width: 2, dash: 'dot' }
+
+        });
+        });
+
+        //“Une los puntos y rellena la figura para mostrar la región factible”
+        if (puntos.length > 0) {
+            let pX = puntos.map(p => p.x); pX.push(puntos[0].x);
+            let pY = puntos.map(p => p.y); pY.push(puntos[0].y);
+
+            trazos.push({
+                x: pX, y: pY,
+                fill: 'toself',
+                fillcolor: 'rgba(37, 99, 235, 0.4)',
+                mode: 'lines+markers',
+                name: 'Región Factible',
+                line: { color: '#1d4ed8', width: 3 },
+                marker: { size: 8, color: '#1e293b' }
+            });
+        }
+        // Configura el diseño del gráfico (títulos, ejes, márgenes)
+        let layout = {
+            title: 'Gráfico de Solución',
+            xaxis: { title: 'x₁', range: [0, maxX], zeroline: true },
+            yaxis: { title: 'x₂', range: [0, maxY], zeroline: true },
+            margin: { l: 50, r: 20, t: 40, b: 50 }
+        };
+        // Dibuja el gráfico con los trazos y el diseño configurado
+        Plotly.newPlot('graficoPlotly', trazos, layout, {responsive: true});
+
+        // Agarra el contenedor donde se mostrarán los resultados
+        const resDiv = document.getElementById('resultados');
+        //si no hay puntos en la region factible
+        if (puntos.length === 0) {
+            //muestra un mensaje de que no hay solucion factible
+            resDiv.innerHTML = '<h3 style="color: red; margin:0;">El problema no tiene solución factible (La región está vacía).</h3>';
+            resDiv.style.display = 'block';
+            return;
+        }
+        //determina que valor de Z es mejor segun si se quiere max o min
+        let bestZ = tipoOpt === 'max' ? -Infinity : Infinity;
+        //indice del punto optimo
+        let optIndex = -1;
+        //crea la tabla de resultados con los encabezados
+        let tableHTML = `
+            <h3 style="margin-top:0;">Análisis de Vértices</h3>
+            <table>
+                <tr><th>Vértice</th><th>Coordenadas (x₁, x₂)</th><th>Evaluación Z = ${z1}x₁ + ${z2}x₂</th><th>Valor Z</th></tr>
+        `;
+                
+        puntos.forEach((p, i) => {
+            const z = (z1 * p.x) + (z2 * p.y);
+            if ((tipoOpt === 'max' && z > bestZ) || (tipoOpt === 'min' && z < bestZ)) { 
+                bestZ = z; 
+                optIndex = i; 
+            }
+        });
+
+        puntos.forEach((p, i) => {
+            const z = (z1 * p.x) + (z2 * p.y);
+            tableHTML += `
+                <tr class="${i === optIndex ? 'optimal-row' : ''}">
+                    <td>${String.fromCharCode(65 + i)}</td>
+                    <td>(${p.x.toFixed(2)}, ${p.y.toFixed(2)})</td>
+                    <td>${z1}(${p.x.toFixed(2)}) + ${z2}(${p.y.toFixed(2)})</td>
+                    <td>${z.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        const textoOptimo = tipoOpt === 'max' ? 'Z Máxima' : 'Z Mínima';
+
+        tableHTML += `</table>
+        <h2 style="color: var(--success); text-align:center; margin-bottom: 0;">
+            Solución Óptima: x₁ = ${puntos[optIndex].x.toFixed(2)}, x₂ = ${puntos[optIndex].y.toFixed(2)} <br> ${textoOptimo} = ${bestZ.toFixed(2)}
+        </h2>`;
+
+        resDiv.innerHTML = tableHTML;
+        resDiv.style.display = 'block';
+    }
+
+    window.onload = () => {
+        generarFormulario();
+        setTimeout(ejecutar, 100);
+    };
+</script>
+</body>
+</html>

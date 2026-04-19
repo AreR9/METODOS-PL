@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Método Simplex</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg: #F9FAFB;
+            --card-bg: #FFFFFF;
+            --text-main: #111827;
+            --text-muted: #6B7280;
+            --border: #E5E7EB;
+            --pivot-col: #DBEAFE;
+            --pivot-row: #FEF08A;
+            --pivot-element: #F87171;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1, h2, h3 { color: var(--text-main); }
+        p { color: var(--text-muted); }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        label { font-weight: 600; }
+        
+        input[type="number"] {
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            width: 80px;
+            text-align: center;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover { background-color: var(--primary-hover); }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+        }
+
+        th { background-color: #F3F4F6; font-weight: 600; }
+
+        .pivot-col { background-color: var(--pivot-col) !important; }
+        .pivot-row { background-color: var(--pivot-row) !important; }
+        .pivot-element { 
+            background-color: var(--pivot-element) !important; 
+            color: white;
+            font-weight: bold;
+        }
+
+        .step-title {
+            margin-top: 2rem;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            display: inline-block;
+            padding-bottom: 0.2rem;
+        }
+
+        .matrix-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .operations-box {
+            background-color: #F3F4F6;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1.1rem;
+            margin-top: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: #6B7280;
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background-color: #4B5563;
+        }
+    </style>
+</head>
+<body>
+
+<a href="Menú.html" class="back-btn">← Volver al Menú</a>
+
+<div class="container">
+    <div class="card">
+        <h1>Método Simplex</h1>
+        <p>Configura tu problema de <strong>Maximización</strong> (restricciones de tipo &le;).</p>
+        
+        <div class="input-group">
+            <label>Variables (x):</label>
+            <input type="number" id="num-vars" value="2" min="1" max="10">
+            <label>Restricciones:</label>
+            <input type="number" id="num-cons" value="3" min="1" max="10">
+            <button onclick="generateInputs()">Generar Formulario</button>
+        </div>
+
+        <div id="input-section" style="display: none;">
+            <h3>Función Objetivo (Maximizar Z)</h3>
+            <div id="objective-function" class="matrix-row"></div>
+            
+            <h3>Restricciones (&le;)</h3>
+            <div id="constraints-section"></div>
+            
+            <button onclick="solveSimplex()" style="margin-top: 1rem;">Resolver Paso a Paso</button>
+        </div>
+    </div>
+
+    <div id="solution-section"></div>
+</div>
+
+<script>
+    let numVars = 2;
+    let numCons = 3;
+
+    function generateInputs() {
+        numVars = parseInt(document.getElementById('num-vars').value);
+        numCons = parseInt(document.getElementById('num-cons').value);
+        
+        const objFuncDiv = document.getElementById('objective-function');
+        const consDiv = document.getElementById('constraints-section');
+        
+        objFuncDiv.innerHTML = 'Z = ';
+        consDiv.innerHTML = '';
+
+        for (let i = 1; i <= numVars; i++) {
+            objFuncDiv.innerHTML += `<input type="number" id="obj-x${i}" value="0"> x${i} `;
+            if (i < numVars) objFuncDiv.innerHTML += ' + ';
+        }
+
+        for (let i = 1; i <= numCons; i++) {
+            let rowHtml = `<div class="matrix-row">`;
+            for (let j = 1; j <= numVars; j++) {
+                rowHtml += `<input type="number" id="cons${i}-x${j}" value="0"> x${j} `;
+                if (j < numVars) rowHtml += ' + ';
+            }
+            rowHtml += ` &le; <input type="number" id="rhs${i}" value="0"></div>`;
+            consDiv.innerHTML += rowHtml;
+        }
+
+        document.getElementById('input-section').style.display = 'block';
+        document.getElementById('solution-section').innerHTML = '';
+    }
+
+    function solveSimplex() {
+        const solutionDiv = document.getElementById('solution-section');
+        solutionDiv.innerHTML = '<div class="card"><h2>Solución Paso a Paso</h2><div id="steps-container"></div></div>';
+        const stepsContainer = document.getElementById('steps-container');
+
+        let totalCols = numVars + numCons + 2; 
+        let totalRows = numCons + 1; 
+        let matrix = Array(totalRows).fill(0).map(() => Array(totalCols).fill(0));
+        let headers = ['Z'];
+        for(let i=1; i<=numVars; i++) headers.push(`x${i}`);
+        for(let i=1; i<=numCons; i++) headers.push(`s${i}`);
+        headers.push('RHS');
+
+        matrix[0][0] = 1; 
+        for (let i = 1; i <= numVars; i++) {
+            matrix[0][i] = -parseFloat(document.getElementById(`obj-x${i}`).value);
+        }
+
+        for (let i = 1; i <= numCons; i++) {
+            for (let j = 1; j <= numVars; j++) {
+                matrix[i][j] = parseFloat(document.getElementById(`cons${i}-x${j}`).value);
+            }
+            matrix[i][numVars + i] = 1; 
+            matrix[i][totalCols - 1] = parseFloat(document.getElementById(`rhs${i}`).value);
+        }
+
+        let iteration = 0;
+        let basicVars = Array.from({length: numCons}, (_, i) => `s${i+1}`);
+
+        while (true) {
+            let minZValue = 0;
+            let pivotCol = -1;
+            for (let j = 1; j < totalCols - 1; j++) {
+                if (matrix[0][j] < minZValue) {
+                    minZValue = matrix[0][j];
+                    pivotCol = j;
+                }
+            }
+
+            if (minZValue >= -1e-10) {
+                renderTable(matrix, headers, basicVars, iteration, -1, -1, stepsContainer, "Solución Óptima Alcanzada");
+                break;
+            }
+
+            let minRatio = Infinity;
+            let pivotRow = -1;
+            for (let i = 1; i <= numCons; i++) {
+                if (matrix[i][pivotCol] > 1e-10) {
+                    let ratio = matrix[i][totalCols - 1] / matrix[i][pivotCol];
+                    if (ratio < minRatio) {
+                        minRatio = ratio;
+                        pivotRow = i;
+                    }
+                }
+            }
+
+            if (pivotRow === -1) {
+                stepsContainer.innerHTML += `<p style="color: red; font-weight: bold;">El problema no está acotado (solución infinita).</p>`;
+                break;
+            }
+
+            renderTable(matrix, headers, basicVars, iteration, pivotRow, pivotCol, stepsContainer, `Iteración ${iteration}`);
+
+            let pivotElement = matrix[pivotRow][pivotCol];
+            basicVars[pivotRow - 1] = headers[pivotCol]; 
+
+            let operationsHtml = `<div class="operations-box">`;
+            operationsHtml += `<strong>Operaciones para la siguiente tabla:</strong><br>`;
+            operationsHtml += `F<sub>${pivotRow}</sub> &larr; F<sub>${pivotRow}</sub> / ${pivotElement.toFixed(2)}<br>`;
+
+            for (let j = 0; j < totalCols; j++) {
+                matrix[pivotRow][j] /= pivotElement;
+            }
+
+            for (let i = 0; i <= numCons; i++) {
+                if (i !== pivotRow) {
+                    let factor = matrix[i][pivotCol];
+                    if (Math.abs(factor) > 1e-10) { 
+                        let sign = factor < 0 ? "+" : "-";
+                        operationsHtml += `F<sub>${i}</sub> &larr; F<sub>${i}</sub> ${sign} ${Math.abs(factor).toFixed(2)} * F<sub>${pivotRow}</sub><br>`;
+                    }
+                    for (let j = 0; j < totalCols; j++) {
+                        matrix[i][j] -= factor * matrix[pivotRow][j];
+                    }
+                }
+            }
+            operationsHtml += `</div>`;
+            stepsContainer.innerHTML += operationsHtml;
+
+            iteration++;
+            if (iteration > 20) { 
+                stepsContainer.innerHTML += `<p>Límite de iteraciones alcanzado.</p>`;
+                break;
+            }
+        }
+
+        if (iteration <= 20) {
+            let finalHtml = `<div class="card" style="margin-top: 2rem; border: 2px solid var(--primary);">`;
+            finalHtml += `<h2 style="color: var(--primary); margin-top: 0;">Resultados Finales</h2>`;
+            
+            let finalZ = matrix[0][totalCols - 1];
+            let finalVars = {}; 
+
+            finalHtml += `<h3>Valores de las variables:</h3>`;
+            for (let j = 1; j <= numVars; j++) {
+                let varName = `x${j}`;
+                let value = 0;
+                let basicIndex = basicVars.indexOf(varName);
+                if (basicIndex !== -1) {
+                    value = matrix[basicIndex + 1][totalCols - 1];
+                }
+                finalVars[varName] = value;
+                let displayVal = Math.abs(value) < 1e-10 ? 0 : value;
+                finalHtml += `<p><strong>${varName}</strong> = ${Number.isInteger(displayVal) ? displayVal : displayVal.toFixed(4)}</p>`;
+            }
+            let displayZ = Math.abs(finalZ) < 1e-10 ? 0 : finalZ;
+            finalHtml += `<p style="font-size: 1.2rem; margin-top: 1rem;"><strong>Z (Máxima) = <span style="color: green;">${Number.isInteger(displayZ) ? displayZ : displayZ.toFixed(4)}</span></strong></p>`;
+
+            finalHtml += `<h3>Comprobación de Restricciones:</h3>`;
+            for (let i = 1; i <= numCons; i++) {
+                let lhsValue = 0;
+                let eqString = "";
+                for (let j = 1; j <= numVars; j++) {
+                    let coef = parseFloat(document.getElementById(`cons${i}-x${j}`).value);
+                    let xVal = finalVars[`x${j}`];
+                    lhsValue += coef * xVal;
+                    
+                    eqString += `(${coef})(${xVal.toFixed(2)})`;
+                    if (j < numVars) eqString += " + ";
+                }
+                let rhsValue = parseFloat(document.getElementById(`rhs${i}`).value);
+                
+                lhsValue = Math.abs(lhsValue) < 1e-10 ? 0 : lhsValue;
+                
+                let isMet = lhsValue <= rhsValue + 0.0001; 
+                let statusColor = isMet ? "green" : "red"; 
+                let statusText = isMet ? "Se cumple " : "No se cumple ";
+
+                finalHtml += `<p style="background-color: var(--bg); padding: 0.5rem; border-radius: 4px;">`;
+                finalHtml += `Restricción ${i}: ${eqString} = <strong>${Number.isInteger(lhsValue) ? lhsValue : lhsValue.toFixed(4)}</strong> &le; ${rhsValue} `;
+                finalHtml += `<span style="color: ${statusColor}; font-weight: bold; margin-left: 10px;">[${statusText}]</span>`;
+                finalHtml += `</p>`;
+            }
+            
+            finalHtml += `</div>`;
+            stepsContainer.innerHTML += finalHtml;
+        }
+    }
+
+    function renderTable(matrix, headers, basicVars, iteration, pRow, pCol, container, title) {
+        let html = `<h3 class="step-title">${title}</h3>`;
+        html += `<div class="table-container"><table><thead><tr><th>Base</th>`;
+        
+        headers.forEach(h => html += `<th>${h}</th>`);
+        html += `</tr></thead><tbody>`;
+
+        for (let i = 0; i < matrix.length; i++) {
+            let rowClass = i === pRow ? 'pivot-row' : '';
+            let baseLabel = i === 0 ? 'Z' : basicVars[i-1];
+            
+            html += `<tr class="${rowClass}"><td><strong>${baseLabel}</strong></td>`;
+            for (let j = 0; j < matrix[i].length; j++) {
+                let cellClass = '';
+                if (j === pCol && i !== pRow) cellClass = 'pivot-col';
+                if (j === pCol && i === pRow) cellClass = 'pivot-element';
+
+                let val = Math.abs(matrix[i][j]) < 1e-10 ? 0 : matrix[i][j]; 
+                html += `<td class="${cellClass}">${Number.isInteger(val) ? val : val.toFixed(2)}</td>`;
+            }
+            html += `</tr>`;
+        }
+        
+        html += `</tbody></table></div>`;
+        
+        if (pRow !== -1 && pCol !== -1) {
+            html += `<p style="font-size: 1.1rem;"><em>Columna pivote: <strong>${headers[pCol]}</strong>, Fila pivote: <strong>F<sub>${pRow}</sub></strong>, Elemento pivote: <strong>${matrix[pRow][pCol].toFixed(2)}</strong></em></p>`;
+        }
+        container.innerHTML += html;
+    }
+    window.onload = generateInputs;
+</script>
+</body>
+</html>
