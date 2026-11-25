@@ -16,7 +16,6 @@
 
 <br>
 
-<img src="capturas/imagen_2026-11-24_211747148.png" alt="Método Gráfico" width="85%">
 
 </div>
 
